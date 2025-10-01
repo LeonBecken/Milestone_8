@@ -2,13 +2,25 @@ from dataclasses import dataclass, field
 from typing import List, Set, Dict, Optional
 from faker import Faker
 import random
+import uuid
+
+
+@dataclass(frozen=True)
+class Author:
+
+    id: str
+    name: str
+    country: str
 
 @dataclass(frozen=True)
 class Book:
 
+    id: str
     title: str
-    author: str
+    author: Author
     category: str
+    year: int
+    pages: int
 
 @dataclass
 class Shelf:
@@ -18,11 +30,9 @@ class Shelf:
     books: List[Book] = field(default_factory=list)
 
     def assign_category(self, category: str) -> None:
-        """Mark this shelf as responsible for a given category."""
         self.categories.add(category)
 
     def add_book(self, book: Book) -> None:
-        """Put a book on this shelf."""
         self.books.append(book)
 
     def __str__(self) -> str:
@@ -47,7 +57,6 @@ class Room:
         target.assign_category(category)
         return target
 
-# ---------------------- Use-cases / utilities ----------------------
 
 def organize_by_category(books: set[Book], room: Room) -> Dict[str, Shelf]:
 
@@ -72,14 +81,15 @@ def print_room_structure(room: Room) -> None:
         print(f"  🗂 Shelf: {shelf.name} | Categories: {', '.join(sorted(shelf.categories)) or '—'}")
         if shelf.books:
             for book in shelf.books:
-                print(f"     - {book.title} (by {book.author}, category: {book.category})")
+                print(f"     - [{book.id}] {book.title} "
+                      f"(by {book.author.name}, {book.year}, {book.pages}p; category: {book.category}; author_country: {book.author.country})")
         else:
             print("     [empty shelf]")
 
 def generate_books(n: int,
                    categories: List[str],
                    seed: Optional[int] = None) -> set[Book]:
-
+    
     if seed is not None:
         random.seed(seed)
         fake = Faker()
@@ -87,12 +97,26 @@ def generate_books(n: int,
     else:
         fake = Faker()
 
-    books = {
-        Book(
-            title=fake.sentence(nb_words=2),
-            author=fake.name(),
-            category=random.choice(categories)
+    def make_author() -> Author:
+        return Author(
+            id=str(uuid.uuid4()),
+            name=fake.name(),
+            country=fake.country()
         )
-        for _ in range(n)
-    }
+
+    books: set[Book] = set()
+    authors_pool = [make_author() for _ in range(max(3, n // 4))]
+
+    while len(books) < n:
+        author = random.choice(authors_pool) if authors_pool else make_author()
+        book = Book(
+            id=str(uuid.uuid4()),
+            title=fake.sentence(nb_words=2).strip("."),
+            author=author,
+            category=random.choice(categories),
+            year=random.randint(1970, 2025),
+            pages=random.randint(80, 900),
+        )
+        books.add(book)
+
     return books
